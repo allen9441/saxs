@@ -74,7 +74,7 @@ jobs:
           ls -R release_assets
 
       - name: Publish to Public Repository
-        if: ${{ secrets.PUBLIC_REPO_TOKEN != '' }}
+        if: secrets.PUBLIC_REPO_TOKEN != ''
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
           PUBLIC_REPO: "allen9441/saxs-releases" 
