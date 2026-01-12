@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('app.py', '.'), ('analysis.py', '.'), ('data_loader.py', '.'), ('materials', 'materials')]
 binaries = []
-hiddenimports = []
+hiddenimports = ['scipy.special._cdflib']
 tmp_ret = collect_all('streamlit')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 

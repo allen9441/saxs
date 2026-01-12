@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch:
+  workflow_dispatch: # 允許手動觸發
 
 jobs:
   build:
@@ -51,7 +51,8 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    
     steps:
       - name: Download Linux Artifact
         uses: actions/download-artifact@v4
@@ -73,7 +74,7 @@ jobs:
           ls -R release_assets
 
       - name: Publish to Public Repository
-        if: env.GH_TOKEN != ''
+        if: ${{ secrets.PUBLIC_REPO_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
           PUBLIC_REPO: "allen9441/saxs-releases" 
