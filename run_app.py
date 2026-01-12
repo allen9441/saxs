@@ -1,5 +1,6 @@
 import streamlit.web.cli as stcli
 import os, sys
+import multiprocessing
 
 def resolve_path(path):
     if getattr(sys, "frozen", False):
@@ -9,6 +10,9 @@ def resolve_path(path):
     return os.path.join(basedir, path)
 
 if __name__ == "__main__":
+    # Windows executable requirement for multiprocessing
+    multiprocessing.freeze_support()
+    
     app_path = resolve_path("app.py")
     
     sys.argv = [
