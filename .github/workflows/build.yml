@@ -47,3 +47,45 @@ jobs:
       with:
         name: saxs_app-windows
         path: dist/saxs_app.exe
+
+publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: saxs_app-linux
+          path: artifacts/linux
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: saxs_app-windows
+          path: artifacts/windows
+
+      - name: Rename artifacts
+        run: |
+          mkdir -p release_assets
+          mv artifacts/linux/saxs_app release_assets/saxs_app-linux
+          mv artifacts/windows/saxs_app.exe release_assets/saxs_app.exe
+          ls -R release_assets
+
+      - name: Publish to Public Repository
+        if: env.GH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          PUBLIC_REPO: "allen9441/saxs-releases" 
+          TAG_NAME: "nightly"
+        run: |
+          # Delete existing tag/release if it exists to keep it "rolling"
+          gh release delete $TAG_NAME --repo $PUBLIC_REPO --cleanup-tag -y || true
+          
+          # Create new release
+          gh release create $TAG_NAME \
+            --repo $PUBLIC_REPO \
+            --title "Nightly Build $(date +'%Y-%m-%d')" \
+            --notes "Automated build from private repository." \
+            --prerelease \
+            release_assets/*
