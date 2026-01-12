@@ -48,7 +48,7 @@ jobs:
         name: saxs_app-windows
         path: dist/saxs_app.exe
 
-publish:
+  publish:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
