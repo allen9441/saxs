@@ -30,6 +30,10 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Compile C++ Extension
+      run: |
+        python setup.py build_ext --inplace
+
     - name: Build with PyInstaller
       run: |
         pyinstaller saxs_app.spec
@@ -77,7 +81,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
           PUBLIC_REPO: "allen9441/saxs-releases" 
-          TAG_NAME: "nightly"
+          TAG_NAME: "nightly-cpp"
         run: |
           # Delete existing tag/release if it exists to keep it "rolling"
           gh release delete $TAG_NAME --repo $PUBLIC_REPO --cleanup-tag -y || true
