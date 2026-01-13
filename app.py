@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor
 from data_loader import load_data
-from analysis import SchulzSphereAnalyzer, worker_analysis
+import os
+from analysis import SchulzSphereAnalyzer, init_worker, worker_analysis_opt
 
 st.set_page_config(page_title="SAXS Analysis", layout="wide")
 
@@ -34,6 +35,17 @@ st.sidebar.subheader("Guinier Parameters")
 q_min = st.sidebar.number_input("Q Min (nm^-1)", value=0.1075, format="%.4f")
 q_max = st.sidebar.number_input("Q Max (nm^-1)", value=0.3103, format="%.4f")
 
+st.sidebar.subheader("運算設定")
+cpu_count = os.cpu_count() or 4
+default_workers = min(4, cpu_count)
+max_workers = st.sidebar.number_input(
+    "並行處理核心數 (Max Workers)", 
+    min_value=1, 
+    max_value=cpu_count, 
+    value=default_workers,
+    help="減少核心數可降低記憶體使用量，增加核心數可加快分析速度(但可能導致記憶體不足)。"
+)
+
 # analysis button
 if st.button("開始分析"):
     st.write("開始分析... 請稍候 (可能需要幾分鐘)。")
@@ -51,14 +63,11 @@ if st.button("開始分析"):
     last_good_rg = None
 
     # data for parallel execution
-    q_list = [q_nm] * total_frames
     intensity_list = [intensities.iloc[:, i].values for i in range(total_frames)]
-    q_range_list = [(q_min, q_max)] * total_frames
-    bg_range_list = [(0.98, 1.023)] * total_frames
 
     # use ProcessPoolExecutor to bypass GIL for CPU-bound tasks
-    with ProcessPoolExecutor() as executor:
-        results_iter = executor.map(worker_analysis, q_list, intensity_list, q_range_list, bg_range_list)
+    with ProcessPoolExecutor(max_workers=max_workers, initializer=init_worker, initargs=(q_nm, (q_min, q_max), (0.98, 1.023))) as executor:
+        results_iter = executor.map(worker_analysis_opt, intensity_list)
         
         # iterate through results as they come in (in order)
         for i, (rg_g, r2_g, bg, res_m) in enumerate(results_iter):

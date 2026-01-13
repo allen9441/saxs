@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.special import gamma, gammaln
 from scipy.stats import linregress
 import saxs_core
 
@@ -305,3 +304,23 @@ def worker_analysis(q, intensity, guinier_q_range, guinier_bg_q_range):
     res_m = schulz.fit_frame(q, intensity_corr)
     
     return rg_g, r2_g, bg, res_m
+
+# reduce memory overhead
+_worker_q = None
+_worker_q_range = None
+_worker_bg_q_range = None
+
+def init_worker(q, q_range, bg_q_range):
+
+    global _worker_q, _worker_q_range, _worker_bg_q_range
+    _worker_q = q
+    _worker_q_range = q_range
+    _worker_bg_q_range = bg_q_range
+
+def worker_analysis_opt(intensity):
+
+    global _worker_q, _worker_q_range, _worker_bg_q_range
+    if _worker_q is None:
+        raise RuntimeError("Worker not initialized properly")
+        
+    return worker_analysis(_worker_q, intensity, _worker_q_range, _worker_bg_q_range)
