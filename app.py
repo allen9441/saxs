@@ -14,7 +14,7 @@ st.title("SAXS Data Analysis")
 # sidebar
 st.sidebar.header("設定")
 uploaded_file = st.sidebar.file_uploader("上傳 Excel 檔案", type=["xlsx"])
-default_file = "lq_data.xlsx"
+default_file = "all_data.xlsx"
 
 filepath = uploaded_file if uploaded_file else default_file
 
@@ -45,6 +45,50 @@ max_workers = st.sidebar.number_input(
     value=default_workers,
     help="減少核心數可降低記憶體使用量，增加核心數可加快分析速度(但可能導致記憶體不足)。"
 )
+
+st.sidebar.subheader("後處理")
+auto_fix = st.sidebar.checkbox("自動修復離群點", value=True)
+outlier_threshold = st.sidebar.slider("離群點判定閾值 (%)", 10, 100, 20, 5) / 100.0
+window_size = st.sidebar.number_input("平滑窗口大小", min_value=3, value=15, step=2, help="增加窗口大小可過濾連續的異常點")
+min_rg_limit = st.sidebar.number_input("最小合理 Rg (nm)", value=3.0, help="低於此數值將被視為異常")
+
+def remove_outliers(df, column='Rg_Model', window=15, threshold=0.2, min_val=3.0):
+    """
+    使用移動中位數檢測並修復離群點及填補缺值
+    """
+    df_clean = df.copy()
+    series = df_clean[column]
+    
+    # 計算移動中位數
+    rolling_median = series.rolling(window=window, center=True).median()
+    
+    # 填充邊緣 NaN
+    rolling_median = rolling_median.fillna(method='bfill').fillna(method='ffill')
+    
+    # 檢測差異
+    diff = np.abs(series - rolling_median)
+    rel_diff = diff / rolling_median
+    
+    # 標記離群點 (相對差異超過閾值)
+    # 注意：如果 series 是 NaN，比較結果為 False，所以需額外處理 NaN
+    outliers = rel_diff > threshold
+    
+    # 物理範圍過濾
+    physical_outliers = (series < min_val) | (series > 100.0)
+    
+    # 包含 NaN (缺值)
+    nan_mask = series.isna()
+    
+    mask = outliers | physical_outliers | nan_mask
+    
+    if np.sum(mask) == 0:
+        return df_clean, 0
+    
+    # 替換為插值
+    df_clean.loc[mask, column] = np.nan
+    df_clean[column] = df_clean[column].interpolate(method='linear', limit_direction='both')
+    
+    return df_clean, np.sum(mask)
 
 # analysis button
 if st.button("開始分析"):
@@ -79,10 +123,9 @@ if st.button("開始分析"):
             intensity = intensity_list[i]
             intensity_corr = intensity - bg
             
-            # 檢測離群值
+            # 檢測單一離群值
             is_outlier = False
             if res_m['success'] and last_good_rg is not None:
-                 # 變化超過 30% 且 Rg 小於 5 nm (通常離群點是向下掉)，視為sus
                  change = abs(res_m['Rg'] - last_good_rg) / last_good_rg
                  if change > 0.3:
                      is_outlier = True
@@ -118,11 +161,39 @@ if st.button("開始分析"):
             })
         
     progress_bar.progress(1.0)
-    st.success("分析完成 (Analysis Complete)!")
     
     # convert to DataFrame
     results_df = pd.DataFrame(results)
+    
+    # auto-fix outliers
+    if auto_fix:
+        try:
+            # Fix Model Rg
+            results_df, n_fixed_m = remove_outliers(
+                results_df, 
+                column='Rg_Model', 
+                window=window_size, 
+                threshold=outlier_threshold, 
+                min_val=min_rg_limit
+            )
+            
+            # Fix Guinier Rg (also filling NaNs)
+            results_df, n_fixed_g = remove_outliers(
+                results_df, 
+                column='Rg_Guinier', 
+                window=window_size, 
+                threshold=outlier_threshold, 
+                min_val=min_rg_limit
+            )
+            
+            if n_fixed_m > 0 or n_fixed_g > 0:
+                st.info(f"已自動修復: {n_fixed_m} 個 Model Rg, {n_fixed_g} 個 Guinier Rg 異常點/缺值。")
+                
+        except Exception as e:
+            st.warning(f"修復離群點時發生錯誤: {e}")
+            
     st.session_state['results'] = results_df
+    st.success("分析完成！")
 
 # display results if available
 if 'results' in st.session_state:
