@@ -1,9 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
+import glob
+import os
 
 datas = [('app.py', '.'), ('analysis.py', '.'), ('data_loader.py', '.'), ('materials', 'materials')]
 binaries = []
-hiddenimports = ['scipy.special._cdflib']
+
+so_files = glob.glob('saxs_core*.so') + glob.glob('saxs_core*.pyd')
+for f in so_files:
+    binaries.append((f, '.'))
+
+hiddenimports = ['scipy.special._cdflib', 'saxs_core']
 tmp_ret = collect_all('streamlit')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 

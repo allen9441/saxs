@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.special import gamma, gammaln
 from scipy.stats import linregress
+import saxs_core
 
 class GuinierAnalyzer:
     def __init__(self, q_range=(0.1075, 0.3103), bg_q_range=(0.98, 1.023)):
@@ -94,34 +95,10 @@ class SchulzSphereAnalyzer:
     def __init__(self):
         pass
 
-    def form_factor_sphere(self, q, r):
-        """
-        球體的散射振幅 P(q) = [3 (sin(qr) - qr cos(qr)) / (qr)^3]^2
-
-        Parameters
-        ----------
-        q : numpy.ndarray
-            散射向量 (nm^-1)
-        r : numpy.ndarray
-            球體半徑 (nm)
-
-        Returns
-        -------
-        numpy.ndarray
-            散射振幅 P(q)
-        """
-        qr = np.outer(q, r)
-        # 避免除以零
-        with np.errstate(divide='ignore', invalid='ignore'):
-            val = 3 * (np.sin(qr) - qr * np.cos(qr)) / (qr**3)
-        val[qr == 0] = 1.0
-        return val**2
-
     def model_intensity(self, q, r_avg, z, scale, bg):
         """
         完整的模型強度計算。
-        使用標準化變數積分 x = R / R_avg 以提高數值穩定性。
-
+        
         Parameters
         ----------
         q : numpy.ndarray
@@ -140,45 +117,7 @@ class SchulzSphereAnalyzer:
         numpy.ndarray
             計算出的模型散射強度 I(q)
         """
-        if r_avg <= 0.1 or z <= 0.1:
-            return np.full_like(q, bg)
-
-        # 標準化 Schulz 分佈 P(x), 其中 x = R / R_avg
-        # x 的平均值為 1, 變異數為 1/(z+1)
-        sigma_x = 1.0 / np.sqrt(z + 1)
-        
-        # 積分範圍 涵蓋主要分佈區域
-        x_min = max(0.01, 1.0 - 5 * sigma_x)
-        x_max = 1.0 + 8 * sigma_x
-        
-        # 增加網格點數至 200 以確保梯度平滑
-        x = np.linspace(x_min, x_max, 200)
-        dx = x[1] - x[0]
-        
-        # log P(x) = (z+1)ln(z+1) - ln Gamma(z+1) + z ln x - (z+1)x
-        # 使用 Log 避免溢位
-        term1 = (z + 1) * np.log(z + 1)
-        term2 = -gammaln(z + 1)
-        term3 = z * np.log(x)
-        term4 = -(z + 1) * x
-        
-        log_Px = term1 + term2 + term3 + term4
-        Px = np.exp(log_Px)
-        R = x * r_avg
-        
-        # 形狀因子 P(q, R)
-        P_qr = self.form_factor_sphere(q, R)
-        
-        # 積分函數: I ~ Integral [ f(R) * R^6 * P(q, R) ] dR
-        # f(R) dR = P(x) dx
-        # 積分項為: P(x) * (x * r_avg)^6 * P_qr
-        
-        integrand = Px * (R**6) * P_qr
-        
-        # 對 x 積分
-        integral = np.sum(integrand, axis=1) * dx
-        
-        return scale * integral + bg
+        return saxs_core.model_intensity(q, r_avg, z, scale, bg)
 
     def estimate_initial_guess(self, q, intensity):
         """
