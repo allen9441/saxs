@@ -81,7 +81,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
           PUBLIC_REPO: "allen9441/saxs-releases" 
-          TAG_NAME: "nightly-cpp"
+          TAG_NAME: "nightly"
         run: |
           # Delete existing tag/release if it exists to keep it "rolling"
           gh release delete $TAG_NAME --repo $PUBLIC_REPO --cleanup-tag -y || true
