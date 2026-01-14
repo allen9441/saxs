@@ -16,7 +16,7 @@ inline double form_factor_sphere(double q, double r) {
     if (std::abs(qr) < 1e-8) {
         return 1.0;
     }
-    double val = 3.0 * (std::sin(qr) - qr * std::cos(qr)) / (qr * qr * qr);
+    double val = 3.0 * (std::sin(qr) - qr * std::cos(qr)) / (qr * qr * qr); // eq 7
     return val * val;
 }
 
@@ -54,6 +54,8 @@ py::array_t<double> model_intensity(
     py::array_t<double> result = py::array_t<double>(n_q);
     auto result_buf = result.request();
     double *ptr_res = (double *)result_buf.ptr;
+
+    py::gil_scoped_release release;
 
     // schulz distribution parameters
     double sigma_x = 1.0 / std::sqrt(z + 1.0);

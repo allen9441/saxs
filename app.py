@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor
 from data_loader import load_data
 import os
+import gc
 from analysis import SchulzSphereAnalyzer, init_worker, worker_analysis_opt
 
 st.set_page_config(page_title="SAXS Analysis", layout="wide")
@@ -63,7 +64,7 @@ def remove_outliers(df, column='Rg_Model', window=15, threshold=0.2, min_val=3.0
     rolling_median = series.rolling(window=window, center=True).median()
     
     # 填充邊緣 NaN
-    rolling_median = rolling_median.fillna(method='bfill').fillna(method='ffill')
+    rolling_median = rolling_median.bfill().ffill()
     
     # 檢測差異
     diff = np.abs(series - rolling_median)
@@ -109,7 +110,6 @@ if st.button("開始分析"):
     # data for parallel execution
     intensity_list = [intensities.iloc[:, i].values for i in range(total_frames)]
 
-    # use ProcessPoolExecutor to bypass GIL for CPU-bound tasks
     with ProcessPoolExecutor(max_workers=max_workers, initializer=init_worker, initargs=(q_nm, (q_min, q_max), (0.98, 1.023))) as executor:
         results_iter = executor.map(worker_analysis_opt, intensity_list)
         
@@ -216,6 +216,7 @@ if 'results' in st.session_state:
         ax1.set_ylabel("Size (nm)")
         ax1.legend()
         st.pyplot(fig1)
+        plt.close(fig1)
         
     with col2:
         st.subheader("重新排列後的尺寸分佈")
@@ -227,6 +228,10 @@ if 'results' in st.session_state:
         ax2.set_ylabel("Size (nm)")
         ax2.legend()
         st.pyplot(fig2)
+        plt.close(fig2)
+
+    # garbage collection
+    gc.collect()
         
     # data table
     st.subheader("結果表格")

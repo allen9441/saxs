@@ -1,3 +1,4 @@
+*.so
 *.xlsx
 *.csv
 *.log

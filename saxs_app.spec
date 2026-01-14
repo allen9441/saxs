@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 import glob
 import os
 
-datas = [('app.py', '.'), ('analysis.py', '.'), ('data_loader.py', '.'), ('materials', 'materials')]
+datas = [('app.py', '.'), ('analysis.py', '.'), ('data_loader.py', '.')]
 binaries = []
 
 so_files = glob.glob('saxs_core*.so') + glob.glob('saxs_core*.pyd')
