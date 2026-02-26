@@ -44,6 +44,7 @@ jobs:
       with:
         name: saxs_app-linux
         path: dist/saxs_app
+        retention-days: 1
 
     - name: Upload Windows Artifact
       if: matrix.os == 'windows-latest'
@@ -51,6 +52,7 @@ jobs:
       with:
         name: saxs_app-windows
         path: dist/saxs_app.exe
+        retention-days: 1
 
   publish:
     needs: build
