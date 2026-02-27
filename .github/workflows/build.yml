@@ -5,15 +5,40 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch: # 允許手動觸發
+  workflow_dispatch:
 
 jobs:
-  build:
+  prepare_release:
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Recreate Nightly Release
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          PUBLIC_REPO: "allen9441/saxs-releases"
+          TAG_NAME: "nightly"
+        run: |
+          gh release delete "$TAG_NAME" --repo "$PUBLIC_REPO" --cleanup-tag -y || true
+          gh release create "$TAG_NAME" \
+            --repo "$PUBLIC_REPO" \
+            --title "Nightly Build $(date +'%Y-%m-%d')" \
+            --notes "Automated build from private repository." \
+            --prerelease
+
+  build_and_upload:
+    needs: prepare_release
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            asset_name: saxs_app-linux
+            build_path: dist/saxs_app
+          - os: windows-latest
+            asset_name: saxs_app.exe
+            build_path: dist/saxs_app.exe
 
     steps:
     - uses: actions/checkout@v4
@@ -38,60 +63,16 @@ jobs:
       run: |
         pyinstaller saxs_app.spec
 
-    - name: Upload Linux Artifact
-      if: matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: saxs_app-linux
-        path: dist/saxs_app
-        retention-days: 1
+    - name: Rename Asset
+      shell: bash
+      run: mv ${{ matrix.build_path }} ${{ matrix.asset_name }}
 
-    - name: Upload Windows Artifact
-      if: matrix.os == 'windows-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: saxs_app-windows
-        path: dist/saxs_app.exe
-        retention-days: 1
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
-    
-    steps:
-      - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: saxs_app-linux
-          path: artifacts/linux
-
-      - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: saxs_app-windows
-          path: artifacts/windows
-
-      - name: Rename artifacts
-        run: |
-          mkdir -p release_assets
-          mv artifacts/linux/saxs_app release_assets/saxs_app-linux
-          mv artifacts/windows/saxs_app.exe release_assets/saxs_app.exe
-          ls -R release_assets
-
-      - name: Publish to Public Repository
-        env:
-          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
-          PUBLIC_REPO: "allen9441/saxs-releases" 
-          TAG_NAME: "nightly"
-        run: |
-          # Delete existing tag/release if it exists to keep it "rolling"
-          gh release delete $TAG_NAME --repo $PUBLIC_REPO --cleanup-tag -y || true
-          
-          # Create new release
-          gh release create $TAG_NAME \
-            --repo $PUBLIC_REPO \
-            --title "Nightly Build $(date +'%Y-%m-%d')" \
-            --notes "Automated build from private repository." \
-            --prerelease \
-            release_assets/*
+    - name: Upload to Public Release
+      if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        PUBLIC_REPO: "allen9441/saxs-releases"
+        TAG_NAME: "nightly"
+      run: |
+        gh release upload "$TAG_NAME" "${{ matrix.asset_name }}" --repo "$PUBLIC_REPO" --clobber
